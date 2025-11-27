@@ -11,6 +11,15 @@ import json
 import sys
 from typing import Dict, Any, Optional
 
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+    from rich.text import Text
+    RICH_AVAILABLE = True
+except ImportError:
+    RICH_AVAILABLE = False
+
 
 def decode_base64url(data: str) -> bytes:
     """Decodes Base64URL encoded data."""
@@ -40,7 +49,7 @@ def decode_jwt(token: str) -> Dict[str, Any]:
 
     if len(parts) != 3:
         raise ValueError(
-            "Ungültiger JWT-Token: Ein JWT muss aus 3 Teilen bestehen (Header.Payload.Signature)")
+            "Invalid JWT token: A JWT must consist of 3 parts (Header.Payload.Signature)")
 
     header_b64, payload_b64, signature_b64 = parts
 
@@ -64,8 +73,12 @@ def decode_jwt(token: str) -> Dict[str, Any]:
         raise ValueError(f"Error decoding token: {e}")
 
 
-def format_pretty(decoded: Dict[str, Any]) -> str:
+def format_pretty(decoded: Dict[str, Any], fancy: bool = True) -> str:
     """Formats the decoded data in a readable format."""
+    if fancy and RICH_AVAILABLE:
+        return format_pretty_fancy(decoded)
+
+    # Fallback to plain text format
     output = []
     output.append("=" * 80)
     output.append("JWT TOKEN - DECODED")
@@ -89,6 +102,65 @@ def format_pretty(decoded: Dict[str, Any]) -> str:
     output.append("=" * 80)
 
     return "\n".join(output)
+
+
+def format_pretty_fancy(decoded: Dict[str, Any]) -> str:
+    """Formats the decoded data with rich formatting."""
+    console = Console()
+
+    # Create panels for each section
+    header_json = json.dumps(decoded['header'], indent=2, ensure_ascii=False)
+    payload_json = json.dumps(decoded['payload'], indent=2, ensure_ascii=False)
+
+    header_syntax = Syntax(header_json, "json",
+                           theme="monokai", line_numbers=False)
+    payload_syntax = Syntax(payload_json, "json",
+                            theme="monokai", line_numbers=False)
+
+    # Create output
+    output_parts = []
+
+    # Title
+    title = Text("JWT TOKEN - DECODED", style="bold bright_cyan")
+    output_parts.append(
+        Panel(title, border_style="bright_cyan", padding=(1, 2)))
+    output_parts.append("")
+
+    # Header section
+    header_panel = Panel(
+        header_syntax,
+        title="[bold bright_yellow]HEADER[/bold bright_yellow]",
+        border_style="bright_yellow",
+        padding=(1, 2)
+    )
+    output_parts.append(header_panel)
+    output_parts.append("")
+
+    # Payload section
+    payload_panel = Panel(
+        payload_syntax,
+        title="[bold bright_green]PAYLOAD[/bold bright_green]",
+        border_style="bright_green",
+        padding=(1, 2)
+    )
+    output_parts.append(payload_panel)
+    output_parts.append("")
+
+    # Signature section
+    signature_panel = Panel(
+        decoded['signature'],
+        title="[bold bright_magenta]SIGNATURE[/bold bright_magenta]",
+        border_style="bright_magenta",
+        padding=(1, 2)
+    )
+    output_parts.append(signature_panel)
+
+    # Render to string
+    with console.capture() as capture:
+        for part in output_parts:
+            console.print(part)
+
+    return capture.get()
 
 
 def format_json(decoded: Dict[str, Any]) -> str:
@@ -124,6 +196,14 @@ Examples:
         help='Output format: json or pretty (default: pretty)'
     )
 
+    parser.add_argument(
+        '--no-fancy',
+        dest='fancy',
+        action='store_false',
+        default=True,
+        help='Disable fancy colored output (default: fancy output enabled)'
+    )
+
     args = parser.parse_args()
 
     # Read token from argument or stdin
@@ -147,18 +227,18 @@ Examples:
         if args.format == 'json':
             output = format_json(decoded)
         else:
-            output = format_pretty(decoded)
+            output = format_pretty(decoded, fancy=args.fancy)
 
         print(output)
 
     except ValueError as e:
-        print(f"Fehler: {e}", file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\nAbgebrochen.", file=sys.stderr)
+        print("\nCancelled.", file=sys.stderr)
         sys.exit(130)
     except Exception as e:
-        print(f"Unerwarteter Fehler: {e}", file=sys.stderr)
+        print(f"Unexpected error: {e}", file=sys.stderr)
         sys.exit(1)
 
 

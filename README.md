@@ -14,27 +14,18 @@ A simple CLI tool to decode JWT tokens without verification. The tool shows the 
 
 ### Install as Python package
 
-**Important:** Make sure to include the dot (`.`) at the end of the command!
-
 If you're using a virtual environment (recommended), activate it first:
 
 ```bash
 # Activate virtual environment (if you have one)
 source venv/bin/activate
 
-# Install the package in editable mode
-pip install -e .
+# Install dependencies
+pip install -r requirements.txt
+
 ```
 
-If `pip` is not available, try `pip3`:
-
-```bash
-pip3 install -e .
-```
-
-After installation, the tool can be used via the command `jwt-decoder`.
-
-### Run directly
+### Run
 
 ```bash
 python jwt_decoder.py <token>
@@ -143,7 +134,7 @@ The tool gives informative error messages when:
 ## Requirements
 
 - Python 3.7 or higher
-- No external dependencies (uses only standard libraries)
+- rich library
 
 ## Notes
 
