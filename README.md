@@ -7,7 +7,6 @@ A simple CLI tool to decode JWT tokens without verification. The tool shows the 
 - Decodes JWT tokens without verification (only base64 decoding)
 - Supports tokens as command line argument or over stdin
 - Two output formats: JSON and readable format
-- No external dependencies (uses only Python standard libraries)
 - Error handling for invalid tokens
 
 ## Installation
