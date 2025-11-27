@@ -1,0 +1,4 @@
+# JWT Decoder CLI Tool
+# This tool uses only Python standard libraries
+# No external dependencies required
+

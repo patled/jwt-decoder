@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""
+JWT Decoder CLI Tool
+
+A Command-Line-Tool to decode JWT tokens without verification.
+"""
+
+import argparse
+import base64
+import json
+import sys
+from typing import Dict, Any, Optional
+
+
+def decode_base64url(data: str) -> bytes:
+    """Decodes Base64URL encoded data."""
+    # Base64URL uses '-' instead of '+' and '_' instead of '/'
+    # Padding is removed, but must be added again
+    padding = 4 - len(data) % 4
+    if padding != 4:
+        data += '=' * padding
+    data = data.replace('-', '+').replace('_', '/')
+    return base64.b64decode(data)
+
+
+def decode_jwt(token: str) -> Dict[str, Any]:
+    """
+    Decodes a JWT token and returns header and payload.
+
+    Args:
+        token: The JWT token as a string
+
+    Returns:
+        Dictionary with 'header' and 'payload' keys
+
+    Raises:
+        ValueError: If the token is invalid
+    """
+    parts = token.split('.')
+
+    if len(parts) != 3:
+        raise ValueError(
+            "Ungültiger JWT-Token: Ein JWT muss aus 3 Teilen bestehen (Header.Payload.Signature)")
+
+    header_b64, payload_b64, signature_b64 = parts
+
+    try:
+        # Decode header
+        header_bytes = decode_base64url(header_b64)
+        header = json.loads(header_bytes.decode('utf-8'))
+
+        # Decode payload
+        payload_bytes = decode_base64url(payload_b64)
+        payload = json.loads(payload_bytes.decode('utf-8'))
+
+        return {
+            'header': header,
+            'payload': payload,
+            'signature': signature_b64  # Signature remains Base64URL encoded
+        }
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Error decoding JSON: {e}")
+    except Exception as e:
+        raise ValueError(f"Error decoding token: {e}")
+
+
+def format_pretty(decoded: Dict[str, Any]) -> str:
+    """Formats the decoded data in a readable format."""
+    output = []
+    output.append("=" * 80)
+    output.append("JWT TOKEN - DECODED")
+    output.append("=" * 80)
+    output.append("")
+
+    output.append("HEADER:")
+    output.append("-" * 80)
+    output.append(json.dumps(decoded['header'], indent=2, ensure_ascii=False))
+    output.append("")
+
+    output.append("PAYLOAD:")
+    output.append("-" * 80)
+    output.append(json.dumps(decoded['payload'], indent=2, ensure_ascii=False))
+    output.append("")
+
+    output.append("SIGNATURE:")
+    output.append("-" * 80)
+    output.append(decoded['signature'])
+    output.append("")
+    output.append("=" * 80)
+
+    return "\n".join(output)
+
+
+def format_json(decoded: Dict[str, Any]) -> str:
+    """Formats the decoded data as JSON."""
+    return json.dumps(decoded, indent=2, ensure_ascii=False)
+
+
+def main():
+    """Main function for the CLI tool."""
+    parser = argparse.ArgumentParser(
+        description='Decodes a JWT token and shows header and payload.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+  
+  echo "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." | %(prog)s
+  
+  %(prog)s --format json eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        """
+    )
+
+    parser.add_argument(
+        'token',
+        nargs='?',
+        help='The JWT token to decode (optional, can also be passed over stdin)'
+    )
+
+    parser.add_argument(
+        '-f', '--format',
+        choices=['json', 'pretty'],
+        default='pretty',
+        help='Output format: json or pretty (default: pretty)'
+    )
+
+    args = parser.parse_args()
+
+    # Read token from argument or stdin
+    token: Optional[str] = args.token
+
+    if not token:
+        # Try to read from stdin
+        if sys.stdin.isatty():
+            parser.error(
+                "No token provided. Please provide token as argument or over stdin.")
+        token = sys.stdin.read().strip()
+
+    if not token:
+        parser.error("No token found.")
+
+    try:
+        # Decode the token
+        decoded = decode_jwt(token)
+
+        # Format the output
+        if args.format == 'json':
+            output = format_json(decoded)
+        else:
+            output = format_pretty(decoded)
+
+        print(output)
+
+    except ValueError as e:
+        print(f"Fehler: {e}", file=sys.stderr)
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nAbgebrochen.", file=sys.stderr)
+        sys.exit(130)
+    except Exception as e:
+        print(f"Unerwarteter Fehler: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
